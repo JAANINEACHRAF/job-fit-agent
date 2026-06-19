@@ -1,0 +1,76 @@
+{
+  "name": "Achraf JAANINE",
+  "title": "AI Engineer",
+  "location": "Paris, France",
+  "summary": "AI Engineer specialized in generative AI, RAG systems, and computer vision, with experience in real, constrained business environments (insurance). Designs end-to-end ML systems across the full lifecycle: data construction, fine-tuning, RAG pipeline design, rigorous offline evaluation (RAGAS), and cloud deployment on AWS.",
+  "seniority": "junior",
+  "languages": ["Arabic (native)", "French (bilingual)", "English (C1)"],
+  "skills": {
+    "genai_llm": ["RAG", "embeddings", "Transformers", "LangChain", "LangGraph", "retrieval", "reranking", "fine-tuning", "Ollama", "Qdrant", "prompt engineering", "RAGAS", "Gemini", "OpenAI", "AI agents", "ReAct", "MCP", "n8n"],
+    "ml_dl": ["PyTorch", "multimodal models", "Hugging Face", "scikit-learn", "feature engineering", "cross-validation", "few-shot learning", "Pandas", "NumPy"],
+    "cv_docai": ["YOLO", "OpenCV", "CNN", "LayoutLM", "Siamese Networks", "document parsing", "EasyOCR", "PaddleOCR"],
+    "dev_serving": ["Python", "SQL", "Git", "uv", "FastAPI", "Django REST", "Docker", "REST API", "PostgreSQL"],
+    "mlops_cloud": ["AWS (S3, EC2, ECS, Fargate, Lambda, ECR, SageMaker, IAM)", "Vertex AI", "GitHub Actions", "CI/CD", "MLflow", "Dataiku", "pytest", "Weights & Biases", "Grafana"]
+  },
+  "experience": [
+    {
+      "role": "AI Engineer / Co-founder",
+      "company": "Appelo",
+      "period": "2026-01 to present",
+      "highlights": [
+        "RAG platform assisting responses to French public procurement tenders from internal docs and buyer files (Excel, Word, scanned PDF, images).",
+        "Document AI pipeline: text/structure extraction (OCR / MinerU / Docling), indexed in Qdrant coupled with a knowledge graph.",
+        "Rigorous evaluation: 223 Q/A test set, RAGAS metrics (faithfulness, answer relevancy, context precision/recall) and latency tracking.",
+        "Industrialization: uv, mypy, Docker, GitHub Actions CI (code, types, tests, model quality), pinned deps.",
+        "Model-provider-agnostic architecture (interchangeable LLM/embeddings via OpenRouter), FastAPI + Gradio."
+      ]
+    },
+    {
+      "role": "Data Scientist / AI Engineer",
+      "company": "Malakoff Humanis (insurance & social protection)",
+      "period": "2024-09 to 2025-10",
+      "highlights": [
+        "Automatic dental quote extraction system to estimate out-of-pocket cost, working with business teams on reimbursement rules and quote-format diversity.",
+        "End-to-end sequential Document AI pipeline: table detection (YOLO), orientation correction, OCR (EasyOCR, PaddleOCR), layout understanding (LayoutLM), structured extraction.",
+        "Dataset built via synthetic data generation (OpenAI API, Faker, ReportLab, HTML) and active-learning annotation (Label Studio).",
+        "End-to-end fine-tuning (PyTorch, Hugging Face) on internal data, orchestrated in Dataiku, artifacts on AWS S3. Functional prototype validated on real internal data and presented to business and technical teams."
+      ]
+    },
+    {
+      "role": "AI Engineer",
+      "company": "AI-Inside Private",
+      "period": "2023-07 to 2023-09",
+      "highlights": [
+        "Few-shot/one-shot model (Siamese Networks, PyTorch) for industrial part recognition.",
+        "End-to-end app with Django REST API and Vue.js front, Dockerized, CI on GitHub Actions."
+      ]
+    },
+    {
+      "role": "VR Developer",
+      "company": "CESI",
+      "period": "2024-03 to 2024-09",
+      "highlights": [
+        "Interactive VR environment for pediatric dental anatomy training (Unity, C#).",
+        "LLM-generated Q/A for the exam module, connected to Moodle."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Multimodal RAG Assistant",
+      "description": "RAG assistant over heterogeneous course material (text, tables, images) with Gemini, LangChain, Qdrant, FastAPI, Docker, Chainlit. Deployed on AWS: containerized services on ECS Fargate (ECR images, IAM roles), ingestion via Lambda, CI/CD on GitHub Actions."
+    },
+    {
+      "name": "GrooveMind",
+      "description": "Two-stage music recommendation (retrieval + reranking) on CLAP embeddings and FAISS with custom reranker. A/B vs vector-only baseline. Containerized FastAPI service."
+    }
+  ],
+  "education": [
+    "M2 Machine Learning for Data Science — Université Paris Cité (2024-2025)",
+    "Engineering Degree in AI & Data Science — ENSAM Meknès (2019-2024)"
+  ],
+  "certifications": [
+    "Machine Learning Specialization, DeepLearning.AI",
+    "AWS Certified Solutions Architect – Associate (in progress)"
+  ]
+}
