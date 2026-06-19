@@ -2,6 +2,7 @@
 import httpx
 
 from job_fit_agent.config import settings
+from job_fit_agent.models import JobOffer
 
 
 def get_access_token() -> str:
@@ -21,8 +22,8 @@ def get_access_token() -> str:
     return resp.json()["access_token"]
 
 
-def search_jobs(keywords: str, token: str, limit: int = 5) -> list[dict]:
-    """Search job offers by keywords. Returns a list of offer dicts."""
+def search_jobs(keywords: str, token: str, limit: int = 5) -> list[JobOffer]:
+    """Search job offers by keywords. Returns a list of JobOffer."""
     resp = httpx.get(
         f"{settings.ft_api_base}/offresdemploi/v2/offres/search",
         params={"motsCles": keywords, "range": f"0-{limit - 1}"},
@@ -30,12 +31,14 @@ def search_jobs(keywords: str, token: str, limit: int = 5) -> list[dict]:
         timeout=10.0,
     )
     resp.raise_for_status()
-    return resp.json().get("resultats", [])
+    if resp.status_code == 204:  # No Content = zero results
+        return []
+    raw_offers = resp.json().get("resultats", [])
+    return [JobOffer.from_api(o) for o in raw_offers]
 
 
 if __name__ == "__main__":
     tok = get_access_token()
     print("Token OK")
-    offers = search_jobs("data scientist", tok, limit=3)
-    for o in offers:
-        print(f"- {o.get('intitule')} | {o.get('lieuTravail', {}).get('libelle')}")
+    for job in search_jobs("data scientist", tok, limit=3):
+        print(f"- {job.title} | {job.location} | {job.contract_type}")

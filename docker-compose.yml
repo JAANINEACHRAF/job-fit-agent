@@ -1,0 +1,22 @@
+services:
+  sandbox:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    image: job-fit-agent-sandbox:latest
+    container_name: job-fit-agent-sandbox
+    working_dir: /workspace
+    user: node
+    stdin_open: true
+    tty: true
+    environment:
+      - TERM=xterm-256color
+    volumes:
+      - .:/workspace
+      - claude-home:/home/node
+    ports:
+      - "8000:8000"   # FastAPI / uvicorn
+    command: bash
+
+volumes:
+  claude-home:
