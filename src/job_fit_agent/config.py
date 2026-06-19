@@ -17,3 +17,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+class LLMSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Swap this freely — e.g. anthropic/claude-sonnet-4.5, openai/gpt-4o, etc.
+    llm_model: str = "anthropic/claude-sonnet-4.5"
+
+
+llm_settings = LLMSettings()
