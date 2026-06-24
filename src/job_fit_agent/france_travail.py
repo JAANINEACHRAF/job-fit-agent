@@ -1,12 +1,18 @@
-"""Minimal France Travail API client: OAuth token + job search."""
+"""France Travail API client: cached OAuth token + resilient job search."""
+import time
+
 import httpx
 
 from job_fit_agent.config import settings
 from job_fit_agent.models import JobOffer
 
+_token_cache: tuple[str, float] | None = None
+# Refresh when less than this fraction of the token's lifetime remains.
+_REFRESH_THRESHOLD = 0.1
 
-def get_access_token() -> str:
-    """Fetch an OAuth2 access token via client credentials flow."""
+
+def _fetch_token() -> tuple[str, float]:
+    """Request a fresh token. Returns (token, absolute_expiry_ts)."""
     resp = httpx.post(
         settings.ft_token_url,
         data={
@@ -19,26 +25,45 @@ def get_access_token() -> str:
         timeout=10.0,
     )
     resp.raise_for_status()
-    return resp.json()["access_token"]
+    payload = resp.json()
+    lifetime = payload.get("expires_in", 1499)
+    # Refresh after (1 - threshold) of the lifetime has elapsed.
+    expiry = time.time() + lifetime * (1 - _REFRESH_THRESHOLD)
+    return payload["access_token"], expiry
 
 
-def search_jobs(keywords: str, token: str, limit: int = 5) -> list[JobOffer]:
-    """Search job offers by keywords. Returns a list of JobOffer."""
-    resp = httpx.get(
-        f"{settings.ft_api_base}/offresdemploi/v2/offres/search",
-        params={"motsCles": keywords, "range": f"0-{limit - 1}"},
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=10.0,
-    )
+def get_access_token(force_refresh: bool = False) -> str:
+    """Return a cached token, refreshing if expired or forced."""
+    global _token_cache
+    if not force_refresh and _token_cache is not None:
+        token, expiry = _token_cache
+        if time.time() < expiry:
+            return token
+    _token_cache = _fetch_token()
+    return _token_cache[0]
+
+
+def search_jobs(keywords: str, limit: int = 5) -> list[JobOffer]:
+    """Search job offers. Auto-refreshes the token on a 401 and retries once."""
+    def _request(token: str) -> httpx.Response:
+        return httpx.get(
+            f"{settings.ft_api_base}/offresdemploi/v2/offres/search",
+            params={"motsCles": keywords, "range": f"0-{limit - 1}"},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0,
+        )
+
+    resp = _request(get_access_token())
+    if resp.status_code == 401:  # token rejected: force-refresh and retry once
+        resp = _request(get_access_token(force_refresh=True))
+
     resp.raise_for_status()
-    if resp.status_code == 204:  # No Content = zero results
+    if resp.status_code == 204:
         return []
-    raw_offers = resp.json().get("resultats", [])
-    return [JobOffer.from_api(o) for o in raw_offers]
+    return [JobOffer.from_api(o) for o in resp.json().get("resultats", [])]
 
 
 if __name__ == "__main__":
-    tok = get_access_token()
     print("Token OK")
-    for job in search_jobs("data scientist", tok, limit=3):
+    for job in search_jobs("data scientist", limit=3):
         print(f"- {job.title} | {job.location} | {job.contract_type}")
