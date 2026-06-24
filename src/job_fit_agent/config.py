@@ -1,9 +1,13 @@
 """Application settings loaded from environment variables."""
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+_ENV_PATH = Path(__file__).parent.parent.parent / ".env"
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_PATH, extra="ignore")
 
     # France Travail API (https://francetravail.io)
     ft_client_id: str = ""
