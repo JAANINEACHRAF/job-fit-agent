@@ -2,6 +2,7 @@
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
 from job_fit_agent.config import llm_settings
@@ -43,8 +44,6 @@ _CRITIC_SYS = (
 )
 
 
-
-
 def _offer_block(offer: JobOffer) -> str:
     return (
         f"Title: {offer.title}\nCompany: {offer.company}\n"
@@ -58,10 +57,11 @@ def assess_node(state: AgentState) -> AgentState:
         f"CANDIDATE PROFILE:\n{state['profile'].to_prompt_context()}\n\n"
         f"JOB OFFER:\n{_offer_block(state['offer'])}"
     )
-    if state.get("critique") and not state["critique"].approved:
+    critique = state.get("critique")
+    if critique is not None and not critique.approved:
         user += (
             "\n\nA reviewer flagged your previous assessment. Fix these issues:\n"
-            + "\n".join(f"- {i}" for i in state["critique"].issues)
+            + "\n".join(f"- {i}" for i in critique.issues)
         )
     resp = get_client().chat.completions.create(
         model=llm_settings.llm_model,
@@ -78,10 +78,12 @@ def assess_node(state: AgentState) -> AgentState:
 
 
 def critique_node(state: AgentState) -> AgentState:
+    assessment = state["assessment"]
+    assert assessment is not None  # assess_node always runs first
     user = (
         f"CANDIDATE PROFILE:\n{state['profile'].to_prompt_context()}\n\n"
         f"JOB OFFER:\n{_offer_block(state['offer'])}\n\n"
-        f"ASSESSMENT TO REVIEW:\n{state['assessment'].model_dump_json(indent=2)}"
+        f"ASSESSMENT TO REVIEW:\n{assessment.model_dump_json(indent=2)}"
     )
     resp = get_client().chat.completions.create(
         model=llm_settings.llm_model,
@@ -91,19 +93,23 @@ def critique_node(state: AgentState) -> AgentState:
         ],
         temperature=0,
     )
-    state["critique"] = Critique.model_validate(parse_json_response(resp.choices[0].message.content))
+    state["critique"] = Critique.model_validate(
+        parse_json_response(resp.choices[0].message.content)
+    )
     state["revisions"] = state.get("revisions", 0) + 1
     return state
 
 
 def should_revise(state: AgentState) -> str:
     """Conditional edge: revise if critic rejected and we have budget left."""
-    if state["critique"].approved or state["revisions"] >= _MAX_REVISIONS:
+    critique = state["critique"]
+    assert critique is not None  # critique_node always runs before this
+    if critique.approved or state["revisions"] >= _MAX_REVISIONS:
         return END
     return "assess"
 
 
-def build_agent() -> object:
+def build_agent() -> CompiledStateGraph:
     g = StateGraph(AgentState)
     g.add_node("assess", assess_node)
     g.add_node("critique", critique_node)
@@ -122,7 +128,7 @@ def run_agent(offer: JobOffer, profile: CandidateProfile) -> AgentState:
         "critique": None,
         "revisions": 0,
     }
-    return agent.invoke(initial)
+    return agent.invoke(initial)  # type: ignore[return-value]
 
 
 if __name__ == "__main__":
@@ -133,9 +139,11 @@ if __name__ == "__main__":
     offer = search_jobs("data scientist", limit=1)[0]
     result = run_agent(offer, prof)
     a = result["assessment"]
+    c = result["critique"]
+    assert a is not None and c is not None
     print(f"{offer.title}")
     print(f"Score: {a.score}/100 | revisions: {result['revisions']}")
-    print(f"Critic approved: {result['critique'].approved}")
-    if result["critique"].issues:
-        print(f"Issues raised: {result['critique'].issues}")
+    print(f"Critic approved: {c.approved}")
+    if c.issues:
+        print(f"Issues raised: {c.issues}")
     print(f"Gaps: {a.gaps}")

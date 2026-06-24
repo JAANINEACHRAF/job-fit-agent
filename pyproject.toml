@@ -30,3 +30,10 @@ dev = [
     "pytest>=9.1.0",
     "ruff>=0.15.17",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
