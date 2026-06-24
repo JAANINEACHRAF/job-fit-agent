@@ -1,12 +1,12 @@
 """LangGraph self-critique agent: assess fit, then validate and revise."""
-import json
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
 from job_fit_agent.config import llm_settings
-from job_fit_agent.matcher import FitAssessment, _client
+from job_fit_agent.llm import get_client, parse_json_response
+from job_fit_agent.matcher import FitAssessment
 from job_fit_agent.models import JobOffer
 from job_fit_agent.profile import CandidateProfile
 
@@ -43,10 +43,6 @@ _CRITIC_SYS = (
 )
 
 
-def _parse(raw: str | None) -> dict:
-    text = (raw or "{}").strip()
-    text = text.removeprefix("```json").removeprefix("```").removesuffix("```")
-    return json.loads(text)
 
 
 def _offer_block(offer: JobOffer) -> str:
@@ -67,7 +63,7 @@ def assess_node(state: AgentState) -> AgentState:
             "\n\nA reviewer flagged your previous assessment. Fix these issues:\n"
             + "\n".join(f"- {i}" for i in state["critique"].issues)
         )
-    resp = _client().chat.completions.create(
+    resp = get_client().chat.completions.create(
         model=llm_settings.llm_model,
         messages=[
             {"role": "system", "content": _ASSESS_SYS},
@@ -76,7 +72,7 @@ def assess_node(state: AgentState) -> AgentState:
         temperature=0,
     )
     state["assessment"] = FitAssessment.model_validate(
-        _parse(resp.choices[0].message.content)
+        parse_json_response(resp.choices[0].message.content)
     )
     return state
 
@@ -87,7 +83,7 @@ def critique_node(state: AgentState) -> AgentState:
         f"JOB OFFER:\n{_offer_block(state['offer'])}\n\n"
         f"ASSESSMENT TO REVIEW:\n{state['assessment'].model_dump_json(indent=2)}"
     )
-    resp = _client().chat.completions.create(
+    resp = get_client().chat.completions.create(
         model=llm_settings.llm_model,
         messages=[
             {"role": "system", "content": _CRITIC_SYS},
@@ -95,7 +91,7 @@ def critique_node(state: AgentState) -> AgentState:
         ],
         temperature=0,
     )
-    state["critique"] = Critique.model_validate(_parse(resp.choices[0].message.content))
+    state["critique"] = Critique.model_validate(parse_json_response(resp.choices[0].message.content))
     state["revisions"] = state.get("revisions", 0) + 1
     return state
 

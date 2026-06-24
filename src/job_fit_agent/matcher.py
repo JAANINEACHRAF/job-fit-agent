@@ -1,10 +1,8 @@
 """LLM-based fit matcher: scores one job offer against the candidate profile."""
-import json
-
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from job_fit_agent.config import llm_settings
+from job_fit_agent.llm import get_client, parse_json_response
 from job_fit_agent.models import JobOffer
 from job_fit_agent.profile import CandidateProfile
 
@@ -27,13 +25,6 @@ _SYSTEM = (
 )
 
 
-def _client() -> OpenAI:
-    return OpenAI(
-        api_key=llm_settings.openrouter_api_key,
-        base_url=llm_settings.openrouter_base_url,
-    )
-
-
 def assess_fit(offer: JobOffer, profile: CandidateProfile) -> FitAssessment:
     """Ask the LLM to score the offer against the profile, return typed result."""
     user = (
@@ -43,7 +34,7 @@ def assess_fit(offer: JobOffer, profile: CandidateProfile) -> FitAssessment:
         f"Contract: {offer.contract_type}\n"
         f"Description:\n{offer.description}"
     )
-    resp = _client().chat.completions.create(
+    resp = get_client().chat.completions.create(
         model=llm_settings.llm_model,
         messages=[
             {"role": "system", "content": _SYSTEM},
@@ -51,9 +42,9 @@ def assess_fit(offer: JobOffer, profile: CandidateProfile) -> FitAssessment:
         ],
         temperature=0,
     )
-    raw = resp.choices[0].message.content or "{}"
-    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
-    return FitAssessment.model_validate(json.loads(raw))
+    return FitAssessment.model_validate(
+        parse_json_response(resp.choices[0].message.content)
+    )
 
 
 if __name__ == "__main__":
