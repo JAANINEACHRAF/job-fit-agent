@@ -1,11 +1,15 @@
-"""Shared LLM client (OpenRouter) and response helpers."""
-import json
-import re
-from typing import Any
+"""Shared LLM client (OpenRouter) and structured-output helper."""
+from typing import TypeVar
 
 from openai import OpenAI
+from pydantic import BaseModel
 
 from job_fit_agent.config import llm_settings
+
+T = TypeVar("T", bound=BaseModel)
+
+# Force OpenRouter to route only to providers that honour the response schema.
+_PROVIDER_REQUIRE = {"require_parameters": True}
 
 
 def get_client() -> OpenAI:
@@ -13,19 +17,28 @@ def get_client() -> OpenAI:
     return OpenAI(
         api_key=llm_settings.openrouter_api_key,
         base_url=llm_settings.openrouter_base_url,
+        timeout=30.0,
+        max_retries=2,
     )
 
 
-def parse_json_response(raw: str | None) -> dict[str, Any]:
-    """Extract and parse the first JSON object from an LLM response.
+def structured_completion(system: str, user: str, schema: type[T]) -> T:
+    """Call the LLM and return a validated instance of `schema`.
 
-    Handles markdown code fences and trailing/leading prose by isolating the
-    outermost {...} block before parsing.
+    Uses OpenRouter structured outputs (JSON schema, strict) so the response is
+    guaranteed to match the Pydantic model — no manual text parsing.
     """
-    text = (raw or "{}").strip()
-    text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    # Isolate the outermost JSON object: first '{' to last '}'.
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match is None:
-        raise ValueError(f"No JSON object found in LLM response: {text[:200]!r}")
-    return json.loads(match.group(0))
+    completion = get_client().beta.chat.completions.parse(
+        model=llm_settings.llm_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        response_format=schema,
+        temperature=0,
+        extra_body={"provider": _PROVIDER_REQUIRE},
+    )
+    parsed = completion.choices[0].message.parsed
+    if parsed is None:
+        raise ValueError("LLM returned no parseable structured output.")
+    return parsed

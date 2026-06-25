@@ -1,8 +1,7 @@
 """LLM-based fit matcher: scores one job offer against the candidate profile."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from job_fit_agent.config import llm_settings
-from job_fit_agent.llm import get_client, parse_json_response
+from job_fit_agent.llm import structured_completion
 from job_fit_agent.models import JobOffer
 from job_fit_agent.profile import CandidateProfile
 
@@ -10,18 +9,22 @@ from job_fit_agent.profile import CandidateProfile
 class FitAssessment(BaseModel):
     """Structured fit assessment returned by the LLM."""
 
-    score: int = Field(ge=0, le=100, description="Overall fit score 0-100")
+    score: int = Field(description="Overall fit score from 0 to 100")
     matched_skills: list[str] = Field(description="Profile skills the job requires")
     gaps: list[str] = Field(description="Job requirements the profile lacks")
     reasoning: str = Field(description="Concise justification for the score")
+
+    @field_validator("score")
+    @classmethod
+    def _clamp_score(cls, v: int) -> int:
+        """Keep the score within 0-100 even if the model drifts out of range."""
+        return max(0, min(100, v))
 
 
 _SYSTEM = (
     "You are a precise technical recruiter. Assess how well a candidate fits a job "
     "offer. Base every judgment only on the provided profile and offer. Be honest "
-    "about gaps. Respond ONLY with a JSON object matching this schema: "
-    '{"score": int 0-100, "matched_skills": [str], "gaps": [str], "reasoning": str}. '
-    "No markdown, no prose outside the JSON."
+    "about gaps. The score must be between 0 and 100."
 )
 
 
@@ -34,17 +37,7 @@ def assess_fit(offer: JobOffer, profile: CandidateProfile) -> FitAssessment:
         f"Contract: {offer.contract_type}\n"
         f"Description:\n{offer.description}"
     )
-    resp = get_client().chat.completions.create(
-        model=llm_settings.llm_model,
-        messages=[
-            {"role": "system", "content": _SYSTEM},
-            {"role": "user", "content": user},
-        ],
-        temperature=0,
-    )
-    return FitAssessment.model_validate(
-        parse_json_response(resp.choices[0].message.content)
-    )
+    return structured_completion(_SYSTEM, user, FitAssessment)
 
 
 if __name__ == "__main__":

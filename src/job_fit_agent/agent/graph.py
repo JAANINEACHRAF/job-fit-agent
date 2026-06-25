@@ -5,8 +5,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
-from job_fit_agent.config import llm_settings
-from job_fit_agent.llm import get_client, parse_json_response
+from job_fit_agent.llm import structured_completion
 from job_fit_agent.matcher import FitAssessment
 from job_fit_agent.models import JobOffer
 from job_fit_agent.profile import CandidateProfile
@@ -31,16 +30,14 @@ _MAX_REVISIONS = 2
 
 _ASSESS_SYS = (
     "You are a precise technical recruiter. Assess candidate-job fit using ONLY the "
-    "provided profile and offer. Respond ONLY with JSON: "
-    '{"score": int 0-100, "matched_skills": [str], "gaps": [str], "reasoning": str}.'
+    "provided profile and offer. Be honest about gaps. The score must be 0 to 100."
 )
 
 _CRITIC_SYS = (
     "You are a strict reviewer of a recruiter's fit assessment. Check that every "
     "matched_skill is actually in the candidate profile, every gap is genuinely "
     "absent, and the score matches the evidence. Flag any hallucinated skill or "
-    "unsupported claim. Respond ONLY with JSON: "
-    '{"approved": bool, "issues": [str]}.'
+    "unsupported claim."
 )
 
 
@@ -52,7 +49,7 @@ def _offer_block(offer: JobOffer) -> str:
     )
 
 
-def assess_node(state: AgentState) -> AgentState:
+def assess_node(state: AgentState) -> dict:
     user = (
         f"CANDIDATE PROFILE:\n{state['profile'].to_prompt_context()}\n\n"
         f"JOB OFFER:\n{_offer_block(state['offer'])}"
@@ -63,21 +60,11 @@ def assess_node(state: AgentState) -> AgentState:
             "\n\nA reviewer flagged your previous assessment. Fix these issues:\n"
             + "\n".join(f"- {i}" for i in critique.issues)
         )
-    resp = get_client().chat.completions.create(
-        model=llm_settings.llm_model,
-        messages=[
-            {"role": "system", "content": _ASSESS_SYS},
-            {"role": "user", "content": user},
-        ],
-        temperature=0,
-    )
-    state["assessment"] = FitAssessment.model_validate(
-        parse_json_response(resp.choices[0].message.content)
-    )
-    return state
+    assessment = structured_completion(_ASSESS_SYS, user, FitAssessment)
+    return {"assessment": assessment}
 
 
-def critique_node(state: AgentState) -> AgentState:
+def critique_node(state: AgentState) -> dict:
     assessment = state["assessment"]
     assert assessment is not None  # assess_node always runs first
     user = (
@@ -85,19 +72,8 @@ def critique_node(state: AgentState) -> AgentState:
         f"JOB OFFER:\n{_offer_block(state['offer'])}\n\n"
         f"ASSESSMENT TO REVIEW:\n{assessment.model_dump_json(indent=2)}"
     )
-    resp = get_client().chat.completions.create(
-        model=llm_settings.llm_model,
-        messages=[
-            {"role": "system", "content": _CRITIC_SYS},
-            {"role": "user", "content": user},
-        ],
-        temperature=0,
-    )
-    state["critique"] = Critique.model_validate(
-        parse_json_response(resp.choices[0].message.content)
-    )
-    state["revisions"] = state.get("revisions", 0) + 1
-    return state
+    critique = structured_completion(_CRITIC_SYS, user, Critique)
+    return {"critique": critique, "revisions": state.get("revisions", 0) + 1}
 
 
 def should_revise(state: AgentState) -> str:
