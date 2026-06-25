@@ -1,5 +1,5 @@
 """Tests for the MCP server: tools are registered with correct metadata."""
-from job_fit_agent.mcp.server import mcp
+from server import mcp
 
 EXPECTED_TOOLS = {
     "search_job_offers",
