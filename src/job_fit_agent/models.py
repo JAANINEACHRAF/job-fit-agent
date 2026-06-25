@@ -1,4 +1,6 @@
 """Domain models for job offers."""
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -16,14 +18,22 @@ class JobOffer(BaseModel):
     model_config = {"populate_by_name": True}
 
     @classmethod
-    def from_api(cls, raw: dict) -> "JobOffer":
-        """Build a JobOffer from a raw France Travail offer dict."""
+    def from_api(cls, raw: dict[str, Any]) -> "JobOffer":
+        """Build a JobOffer from a raw France Travail offer dict.
+
+        Nested objects (entreprise, lieuTravail, origineOffre) can be missing
+        OR explicitly null in the API response, so we coerce both to {} before
+        reading sub-fields.
+        """
+        entreprise = raw.get("entreprise") or {}
+        lieu = raw.get("lieuTravail") or {}
+        origine = raw.get("origineOffre") or {}
         return cls(
             id=raw["id"],
             intitule=raw.get("intitule", ""),
             description=raw.get("description"),
-            company=raw.get("entreprise", {}).get("nom"),
-            location=raw.get("lieuTravail", {}).get("libelle"),
+            company=entreprise.get("nom"),
+            location=lieu.get("libelle"),
             contract_type=raw.get("typeContratLibelle"),
-            url=raw.get("origineOffre", {}).get("urlOrigine"),
+            url=origine.get("urlOrigine"),
         )

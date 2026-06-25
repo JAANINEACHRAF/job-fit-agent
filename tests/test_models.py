@@ -25,3 +25,20 @@ def test_from_api_handles_missing_fields():
     assert job.id == "X"
     assert job.company is None
     assert job.location is None
+
+
+def test_from_api_handles_null_nested_objects():
+    """France Travail can return nested objects as explicit null (e.g. anonymized
+    offers with entreprise: null), which must not crash from_api."""
+    raw = {
+        "id": "Y",
+        "intitule": "Data Scientist",
+        "entreprise": None,
+        "lieuTravail": None,
+        "origineOffre": None,
+    }
+    job = JobOffer.from_api(raw)
+    assert job.id == "Y"
+    assert job.company is None
+    assert job.location is None
+    assert job.url is None

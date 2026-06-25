@@ -3,8 +3,10 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
+# Absolute path to the project-root .env, resolved from this file's location so
+# settings load correctly regardless of the current working directory.
 _ENV_PATH = Path(__file__).parent.parent.parent / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_PATH, extra="ignore")
@@ -24,7 +26,7 @@ settings = Settings()
 
 
 class LLMSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_PATH, extra="ignore")
 
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
