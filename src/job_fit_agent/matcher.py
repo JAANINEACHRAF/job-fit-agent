@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 from job_fit_agent.llm import structured_completion
 from job_fit_agent.models import JobOffer
 from job_fit_agent.profile import CandidateProfile
+from job_fit_agent.prompts import load_prompt
 
 
 class FitAssessment(BaseModel):
@@ -21,11 +22,7 @@ class FitAssessment(BaseModel):
         return max(0, min(100, v))
 
 
-_SYSTEM = (
-    "You are a precise technical recruiter. Assess how well a candidate fits a job "
-    "offer. Base every judgment only on the provided profile and offer. Be honest "
-    "about gaps. The score must be between 0 and 100."
-)
+_SYSTEM = load_prompt("fit_assess_system")
 
 
 def assess_fit(offer: JobOffer, profile: CandidateProfile) -> FitAssessment:
