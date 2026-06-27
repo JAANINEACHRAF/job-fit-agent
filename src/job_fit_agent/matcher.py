@@ -41,11 +41,11 @@ def assess_fit(offer: JobOffer, profile: CandidateProfile) -> FitAssessment:
 
 
 if __name__ == "__main__":
-    from job_fit_agent.france_travail import search_jobs
+    from job_fit_agent.france_travail import FranceTravailSource
     from job_fit_agent.profile import load_profile
 
     prof = load_profile()
-    offer = search_jobs("data scientist", limit=1)[0]
+    offer = FranceTravailSource().search("data scientist", limit=1)[0]
     result = assess_fit(offer, prof)
     print(f"{offer.title}\nScore: {result.score}/100")
     print(f"Matched: {result.matched_skills}")

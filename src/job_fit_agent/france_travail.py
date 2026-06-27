@@ -5,7 +5,7 @@ import httpx
 
 from job_fit_agent.config import settings
 from job_fit_agent.models import JobOffer
-from job_fit_agent.sources import JobSource, JobSourceAuthError, JobSourceUnavailable
+from job_fit_agent.sources import JobSourceAuthError, JobSourceUnavailable
 
 _token_cache: tuple[str, float] | None = None
 # Refresh when less than this fraction of the token's lifetime remains.
@@ -86,19 +86,7 @@ class FranceTravailSource:
         return resp
 
 
-# Default instance; the annotation also asserts FranceTravailSource satisfies JobSource.
-_default_source: JobSource = FranceTravailSource()
-
-
-def search_jobs(keywords: str, limit: int = 5) -> list[JobOffer]:
-    """Deprecated shim kept during migration; delegates to the default source.
-
-    Removed once all callers depend on ``JobSource`` directly (later step).
-    """
-    return _default_source.search(keywords, limit)
-
-
 if __name__ == "__main__":
     print("Token OK")
-    for job in search_jobs("data scientist", limit=3):
+    for job in FranceTravailSource().search("data scientist", limit=3):
         print(f"- {job.title} | {job.location} | {job.contract_type}")

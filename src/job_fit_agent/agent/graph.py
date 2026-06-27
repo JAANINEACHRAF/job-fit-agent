@@ -108,11 +108,11 @@ def run_agent(offer: JobOffer, profile: CandidateProfile) -> AgentState:
 
 
 if __name__ == "__main__":
-    from job_fit_agent.france_travail import search_jobs
+    from job_fit_agent.france_travail import FranceTravailSource
     from job_fit_agent.profile import load_profile
 
     prof = load_profile()
-    offer = search_jobs("data scientist", limit=1)[0]
+    offer = FranceTravailSource().search("data scientist", limit=1)[0]
     result = run_agent(offer, prof)
     a = result["assessment"]
     c = result["critique"]

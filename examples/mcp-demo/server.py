@@ -2,11 +2,12 @@
 from mcp.server.fastmcp import FastMCP
 
 from job_fit_agent.agent.graph import run_agent
-from job_fit_agent.france_travail import search_jobs
+from job_fit_agent.france_travail import FranceTravailSource
 from job_fit_agent.matcher import FitAssessment, assess_fit
 from job_fit_agent.profile import load_profile
 
 mcp = FastMCP("job-fit-agent")
+_source = FranceTravailSource()
 
 
 @mcp.tool()
@@ -19,7 +20,7 @@ def search_job_offers(keywords: str, limit: int = 5) -> list[dict]:
 
     Returns a list of offers with id, title, company, location, contract_type.
     """
-    offers = search_jobs(keywords, limit=limit)
+    offers = _source.search(keywords, limit=limit)
     return [o.model_dump(exclude={"description"}) for o in offers]
 
 
@@ -34,7 +35,7 @@ def assess_offer_fit(offer_id: str, keywords: str) -> dict:
     Returns a fit assessment with score, matched_skills, gaps, reasoning.
     """
     profile = load_profile()
-    offers = search_jobs(keywords, limit=20)
+    offers = _source.search(keywords, limit=20)
     offer = next((o for o in offers if o.id == offer_id), None)
     if offer is None:
         return {"error": f"Offer {offer_id} not found for keywords '{keywords}'."}
@@ -56,7 +57,7 @@ def assess_offer_fit_validated(offer_id: str, keywords: str) -> dict:
     Returns the validated assessment plus the critic's verdict.
     """
     profile = load_profile()
-    offers = search_jobs(keywords, limit=20)
+    offers = _source.search(keywords, limit=20)
     offer = next((o for o in offers if o.id == offer_id), None)
     if offer is None:
         return {"error": f"Offer {offer_id} not found for keywords '{keywords}'."}
