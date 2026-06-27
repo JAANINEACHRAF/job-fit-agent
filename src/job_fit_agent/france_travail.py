@@ -5,6 +5,7 @@ import httpx
 
 from job_fit_agent.config import settings
 from job_fit_agent.models import JobOffer
+from job_fit_agent.sources import JobSource, JobSourceAuthError, JobSourceUnavailable
 
 _token_cache: tuple[str, float] | None = None
 # Refresh when less than this fraction of the token's lifetime remains.
@@ -43,24 +44,58 @@ def get_access_token(force_refresh: bool = False) -> str:
     return _token_cache[0]
 
 
+class FranceTravailSource:
+    """France Travail implementation of the ``JobSource`` protocol.
+
+    Wraps the cached-token client above and translates library-specific failures
+    (httpx errors, auth rejections) into job-source domain errors, so the core
+    handles any source uniformly without knowing httpx exists.
+    """
+
+    def search(self, keywords: str, limit: int = 5) -> list[JobOffer]:
+        """Search offers. Refreshes the token on a 401 and retries once."""
+        try:
+            resp = self._search_request(keywords, limit)
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            if status in (401, 403):
+                raise JobSourceAuthError(
+                    f"France Travail rejected credentials (HTTP {status})"
+                ) from e
+            raise JobSourceUnavailable(f"France Travail returned HTTP {status}") from e
+        except httpx.RequestError as e:  # network error or timeout
+            raise JobSourceUnavailable("France Travail is unreachable") from e
+
+        if resp.status_code == 204:
+            return []
+        return [JobOffer.from_api(o) for o in resp.json().get("resultats", [])]
+
+    def _search_request(self, keywords: str, limit: int) -> httpx.Response:
+        def _request(token: str) -> httpx.Response:
+            return httpx.get(
+                f"{settings.ft_api_base}/offresdemploi/v2/offres/search",
+                params={"motsCles": keywords, "range": f"0-{limit - 1}"},
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+
+        resp = _request(get_access_token())
+        if resp.status_code == 401:  # token rejected: force-refresh and retry once
+            resp = _request(get_access_token(force_refresh=True))
+        resp.raise_for_status()
+        return resp
+
+
+# Default instance; the annotation also asserts FranceTravailSource satisfies JobSource.
+_default_source: JobSource = FranceTravailSource()
+
+
 def search_jobs(keywords: str, limit: int = 5) -> list[JobOffer]:
-    """Search job offers. Auto-refreshes the token on a 401 and retries once."""
-    def _request(token: str) -> httpx.Response:
-        return httpx.get(
-            f"{settings.ft_api_base}/offresdemploi/v2/offres/search",
-            params={"motsCles": keywords, "range": f"0-{limit - 1}"},
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10.0,
-        )
+    """Deprecated shim kept during migration; delegates to the default source.
 
-    resp = _request(get_access_token())
-    if resp.status_code == 401:  # token rejected: force-refresh and retry once
-        resp = _request(get_access_token(force_refresh=True))
-
-    resp.raise_for_status()
-    if resp.status_code == 204:
-        return []
-    return [JobOffer.from_api(o) for o in resp.json().get("resultats", [])]
+    Removed once all callers depend on ``JobSource`` directly (later step).
+    """
+    return _default_source.search(keywords, limit)
 
 
 if __name__ == "__main__":
