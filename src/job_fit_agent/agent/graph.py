@@ -9,6 +9,7 @@ from job_fit_agent.llm import structured_completion
 from job_fit_agent.matcher import FitAssessment
 from job_fit_agent.models import JobOffer
 from job_fit_agent.profile import CandidateProfile
+from job_fit_agent.prompts import load_prompt
 
 
 class Critique(BaseModel):
@@ -28,17 +29,9 @@ class AgentState(TypedDict):
 
 _MAX_REVISIONS = 2
 
-_ASSESS_SYS = (
-    "You are a precise technical recruiter. Assess candidate-job fit using ONLY the "
-    "provided profile and offer. Be honest about gaps. The score must be 0 to 100."
-)
+_ASSESS_SYS = load_prompt("agent_assess_system")
 
-_CRITIC_SYS = (
-    "You are a strict reviewer of a recruiter's fit assessment. Check that every "
-    "matched_skill is actually in the candidate profile, every gap is genuinely "
-    "absent, and the score matches the evidence. Flag any hallucinated skill or "
-    "unsupported claim."
-)
+_CRITIC_SYS = load_prompt("agent_critic_system")
 
 
 def _offer_block(offer: JobOffer) -> str:
